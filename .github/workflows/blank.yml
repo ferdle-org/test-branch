@@ -40,5 +40,3 @@ jobs:
         run: |
           git checkout -b feature/enterprise-release
           git push origin feature/enterprise-release
-          git checkout ${{ env.PROD_BRANCH }}
-          git push origin "${{ env.PROD_BRANCH }}"

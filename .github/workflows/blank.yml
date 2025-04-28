@@ -13,6 +13,8 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
+permissions: write-all
+
 env:
   HEAD_BRANCH: feature/update-ent-workflow-test
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -14,48 +14,6 @@ jobs:
   create-branch:
     runs-on: ubuntu-latest
     steps:
-      - name: Prepare
-        id: prepare
-        uses: actions/github-script@v7
-        with:
-          retries: 5
-          script: |
-            // INPUT
-            const env = '${{ inputs.env }}';
-            const version = '${{ inputs.version }}';
-
-            // BODY
-            const { branch, ref } = await getHotfixBranchName(env, version);
-            console.log({ branch, ref });
-            core.setOutput('branch', branch);
-            core.setOutput('ref', ref);
-
-            async function getHotfixBranchName(env, version) {
-             	if (isVersion(version)) {
-            		const [date, merge] = version.split(".");
-            		return { branch: `${env}-release-${date}.${merge}`, ref: version };
-             	} else {
-            		console.warn(`Usage of git sha for version is discouraged!`);
-            		return { branch: `${env}-release-${version}`, ref: await getFullCommitSha(version) };
-             	}
-            }
-
-            function isVersion(input) {
-             	const regex = /^\d{8}\.\d+\.\d+$/;
-             	return regex.test(input);
-            }
-
-            async function getFullCommitSha(shortSha) {
-              console.log(`Fetching full commit SHA for: ${shortSha}`);
-              const commit = await github.rest.repos.getCommit({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: shortSha
-              });
-
-              return commit.data.sha;
-            }
-
       - name: Checkout
         uses: actions/checkout@v5
         with:

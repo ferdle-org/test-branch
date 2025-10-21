@@ -25,7 +25,7 @@ jobs:
         id: create-branch
         run: |
           # INPUT
-          readonly BRANCH_NAME="${{ steps.prepare.outputs.branch }}"
+          readonly BRANCH_NAME="test"
           created="false"
 
           # BODY

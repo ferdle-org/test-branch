@@ -12,7 +12,7 @@ defaults:
 
 jobs:
   create-branch:
-    runs-on: ferdlestier-2
+    runs-on: self-hosted
     steps:
       - name: Checkout
         uses: actions/checkout@v5

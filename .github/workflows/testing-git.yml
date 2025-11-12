@@ -1,0 +1,13 @@
+name: CI
+on:
+  workflow_dispatch:
+
+jobs:
+  transform-test:
+    runs-on: ubuntu-latest 
+    steps:
+      - uses: actions/checkout@v5
+      - id: git-config
+        shell: bash
+        run: |
+          git ls-remote https://github.com/ferdle-org/test-branch -q >/dev/null

@@ -1,0 +1,158 @@
+name: "Build and Push Docker Image"
+run-name: Build and Push Docker Image [${{ github.ref_name }}]
+on:
+  workflow_dispatch:
+
+jobs:
+  ##############################################################################################################
+  # Run tests
+  ##############################################################################################################
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      ##############################################################################################################
+      # Write custom settings.xml for GitHub Packages (manual method)
+      ##############################################################################################################
+      - name: Write settings.xml with real user
+        run: |
+          echo "<settings><servers><server><id>github</id><username>alaugks</username><password>${{ secrets.GH_PACKAGES_TOKEN }}</password></server></servers></settings>" > ${{ github.workspace }}/settings.xml
+
+      - name: Inspect settings.xml
+        run: |
+          echo "::group::settings.xml"
+          cat ${{ github.workspace }}/settings.xml
+          echo "::endgroup::"
+
+      # Setup Java
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: 'zulu'
+          server-id: github
+          settings-path: ${{ github.workspace }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Maven Cache
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      # Generate IMAGE_NAME
+      - name: Evaluate Image Tag
+        run: |
+          if [[ '${{github.ref_type}}' != 'tag' ]]; then
+              echo "No build without tag"
+              exit 1
+          fi
+          echo "IMAGE_NAME_TEST=${{vars.AWS_ECR_REPOSITORY}}:latest-test" >> $GITHUB_ENV
+
+      # Build services test environment
+      - name: Build services test environment
+        run: |
+          docker compose -f ".deploy/docker-compose.yml" up --build -d 
+
+      # Install packages
+      - name: Install packages
+        run: |
+          mvn clean install -Dmaven.test.skip=true --settings ${{ github.workspace }}/settings.xml
+
+      # Run Tests
+      - name: Run Tests
+        run: |
+          mvn test --settings ${{ github.workspace }}/settings.xml
+
+  ##############################################################################################################
+  # Build and push to AWS
+  ##############################################################################################################
+  build:
+    needs: test
+    name: Build and Push Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3.6.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.10.0
+
+      # Setup Java
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: 'zulu'
+          server-id: github
+          settings-path: ${{ github.workspace }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Maven Cache
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      # Create src/main/resources/application-prod.properties
+      - name: Create src/main/resources/application-prod.properties
+        run: |
+          propertiesFilePath=src/main/resources/application-prod.properties
+          echo "${{secrets.APPLICATION_PROPERTIES_PROD}}" > $propertiesFilePath
+          
+          if [[ ! -f $propertiesFilePath ]]; then
+            echo "$propertiesFilePath prod not exists"
+            exit 1
+          fi
+
+      # Generate IMAGE_NAME
+      - name: Evaluate Image Tag
+        run: |
+          if [[ '${{github.ref_type}}' != 'tag' ]]; then
+              echo "No build and push without a tag"
+              exit 1
+          fi
+          echo "IMAGE_NAME=${{vars.AWS_ECR_REPOSITORY}}:${{github.ref_name}}" >> $GITHUB_ENV
+
+      # Login to ECR
+      - name: Login to ECR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{vars.AWS_ECR_REPOSITORY}}
+          username: ${{secrets.AWS_ACCESS_KEY_ID}}
+          password: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+
+      # Install packages
+      - name: Install packages
+        run: |
+          mvn clean install -Dmaven.test.skip=true --settings ${{ github.workspace }}/settings.xml
+
+      # Build and push image
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{env.IMAGE_NAME}}

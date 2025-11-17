@@ -1,0 +1,55 @@
+name: Checkov Bicep Scan
+
+on:
+  pull_request:
+
+permissions: {}
+
+concurrency:
+  group: ${{ format('pr{0}', github.event.number) }}
+  cancel-in-progress: true
+
+jobs:
+  # This workflow contains a single job called "scan"
+  checkov-bicep-scan:
+    permissions:
+      contents: read # for actions/checkout to fetch code
+      security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
+      actions: read # only required for a private repository by github/codeql-action/upload-sarif to get the Action run status
+
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so follow-up steps can access it
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Checkov Bicep Scan
+        uses: bridgecrewio/checkov-action@de3c276ef8118f7ce6bcb2e51d8dd3d65ac0ae36 # v12.3073.0
+        with:
+          # This will add both a CLI output to the console and create a results.sarif file
+          output_format: cli,sarif
+          output_file_path: console,results.sarif
+          quiet: true # optional: display only failed checks
+          # We're uploading the SARIF for processing by GitHub, so we don't need Checkov to fail the job
+          soft_fail: true # optional: do not return an error code if there are failed checks
+          framework: bicep
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v4 # Immutable, hash not needed.
+        with:
+          sarif_file: results.sarif
+
+        # Keeping files briefly for review in case of issues
+      - name: Upload Scan Results as Artifact
+        continue-on-error: true
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          path: results.sarif
+          name: checkov-bicep-results
+          retention-days: 3
+          if-no-files-found: ignore

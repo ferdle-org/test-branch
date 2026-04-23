@@ -4,4 +4,4 @@
 # This version is vulnerable to CVE-2023-46136 (a denial of service vulnerability).
 # The security patch was released in version 3.0.1.
 # This is a perfect test for Dependabot alerts.
-Werkzeug==3.0.0
+Werkzeug==3.0.3

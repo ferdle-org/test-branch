@@ -34,3 +34,6 @@ jobs:
         run: |
           echo Add other actions to build,
           echo test, and deploy your project.
+      - name: Test Alert
+        id: test
+        uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f

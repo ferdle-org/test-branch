@@ -53,3 +53,7 @@ jobs:
           name: checkov-bicep-results
           retention-days: 3
           if-no-files-found: ignore
+
+      - name: test alert
+        uses: shivammathur/setup-php@2.37.0
+    
